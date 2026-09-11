@@ -1,71 +1,100 @@
-# .NET Training
+# TicketFlow (CLI)
 
-## Input Parser & Summarizer
+A support-ticket tracker you run from the console. Create tickets, filter them, change
+their status, assign them to people, and check overall stats.
 
-A C#/.NET console application developed as part of my .NET training to practice core C# and .NET concepts.
+## Try it
 
-### Objectives
+```
+dotnet run --project TicketFlow
+```
 
-Build a console application that accepts user input, identifies it as numeric or text, and generates a summary of the provided data.
+With no arguments, TicketFlow drops you into an interactive session so you can try
+several commands in a row:
 
-### Features
+```
+ticketflow> add --title "Login page throws 500" --priority High --assignee alice
+  [OK] Created ticket a1b2c3d4 - "Login page throws 500"
 
-* **Main Menu:** Analyze Input, Help, and Exit
-* **Numeric Analysis:**
+ticketflow> list
+  ╔══════════╦════════════════════════╦══════════╦════════╦══════════╗
+  ║ ID       ║ TITLE                  ║ PRIORITY ║ STATUS ║ ASSIGNEE ║
+  ╠══════════╬════════════════════════╬══════════╬════════╬══════════╣
+  ║ a1b2c3d4 ║ Login page throws 500  ║ High     ║ Open   ║ alice    ║
+  ╚══════════╩════════════════════════╩══════════╩════════╩══════════╝
 
-  * Count, sum, average, minimum, and maximum
-  * Positive, negative, and zero values
-  * Whole, even, and odd numbers
-  * Unique and duplicate values
-* **Text Analysis:**
+ticketflow> status a1b2 InProgress
+  [OK] Ticket a1b2c3d4 status set to InProgress.
 
-  * Word and character count
-  * Characters excluding spaces
-  * Unique words
-  * Average word length
-  * Longest and shortest words
+ticketflow> exit
+```
 
-### Concepts Practiced
+You can also run one command at a time from a regular shell:
 
-* C# fundamentals and data types
-* Conditions, loops, and switch statements
-* Methods and arrays
-* Strings and string manipulation
-* Input validation and `TryParse`
-* LINQ
-* Console I/O and formatting
-* Basic error handling
+```
+dotnet run --project TicketFlow -- add --title "Login page throws 500" --priority High
+dotnet run --project TicketFlow -- stats
+```
 
-### Day 1 Outcome
+**Heads up:** there's no save file yet, so data only lives for as long as one run.
+Do all your testing in a single interactive session (as above) rather than across
+separate `dotnet run` calls, or you'll just see an empty list each time.
 
-Successfully developed a functional console application demonstrating core C# programming and basic data-processing concepts.
+## Screenshots
 
----
+Startup banner and `help`:
 
-## Day 2 – OOP & Collections+LINQ Refactor
+![Banner and help screen](docs/screenshots/banner-and-help.png)
 
-### What I Did
+`add` (with a missing-title error first), `list`, and `search`:
 
-Refactored the Day 1 application — originally one large procedural `Program.cs` — into an object-oriented design, without changing what the app does for the user.
+![add, list, and search](docs/screenshots/add-list-search.png)
 
-* Extracted the analysis logic behind an `ISummarizer` interface, implemented by `NumberSummarizer` and `TextSummarizer`
-* Introduced `InputProcessor`, which owns a summarizer for each input type (composition, "has-a") and picks the right one at runtime, instead of using inheritance
-* Modeled parsed input as an immutable `InputData` record (`Value`, `Type`) backed by an `InputType` enum
-* Slimmed `Program.cs` down to menu handling and console I/O only, delegating all parsing and summarizing to the new services
+`stats --json`:
 
-### Concepts Practiced
+![stats as JSON](docs/screenshots/stats-json.png)
 
-* Interfaces and polymorphism (`ISummarizer`)
-* Composition over inheritance ("has-a" vs. "is-a")
-* Records, immutability, and enums
-* Separation of concerns (UI vs. business logic)
-* Continued application of LINQ (`Where`, `Select`, `GroupBy`, `Distinct`, aggregates) within the extracted services
+`stats` as a colored table, then `exit`:
 
-### Day 2 Outcome
+![stats table and exit](docs/screenshots/stats-table.png)
 
-Same numeric and text analysis features as Day 1, now organized into a maintainable, testable OOP structure instead of one large procedural file.
+## Commands
 
-**Training Progress:** Day 2 completed
+| Command | What it does |
+|---|---|
+| `add --title "..." [--description "..."] [--priority Low\|Medium\|High\|Critical] [--assignee name]` | Create a ticket. Priority defaults to Medium; status always starts Open. |
+| `list [--status ...] [--priority ...] [--assignee ...] [--json]` | Show tickets, newest first. Any combination of filters can be used together. |
+| `status <id> <NewStatus>` | Move a ticket to Open / InProgress / Resolved / Closed. |
+| `assign <id> <username>` | Set or reassign who's working on it. |
+| `search <text>` | Find tickets whose title or description mentions the text. |
+| `stats [--json]` | Counts per status, counts per priority, and the oldest ticket still Open. |
+| `help` | Print this command list from inside the app. |
+| `exit` | Leave the interactive session. |
 
+For `<id>`, you don't need to type the full GUID - the short id shown by `list`/`add`
+(or even just the first few characters, as long as they're not shared by another
+ticket) is enough.
 
+## How it's put together
 
+```
+Models/        Ticket (a record), TicketPriority, TicketStatus
+Repositories/  ITicketRepository + an in-memory implementation
+Services/      TicketService - the actual add/list/filter/stats logic
+Cli/           turns typed input into a command, runs it, prints the result
+```
+
+The layering is deliberate: `TicketService` only knows about `ITicketRepository` (an
+interface), never the concrete in-memory store - so swapping in real file or database
+storage later is a new class, not a rewrite. Same idea with the console output: nothing
+in `TicketService` prints or colors anything, so the logic stays testable without a
+terminal attached.
+
+`Ticket` is a record, and every change (status, assignee) produces a new copy via a
+`with` expression rather than editing the ticket in place.
+
+## Not built yet, on purpose
+
+Saving to a file (so data survives a restart) and structured async error handling are
+later milestones, not oversights - this stage focuses on the domain model, the
+repository pattern, and LINQ-based filtering/stats.
