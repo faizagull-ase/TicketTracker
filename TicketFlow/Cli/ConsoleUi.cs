@@ -82,11 +82,11 @@ public class ConsoleUi
         Console.WriteLine($"    title    : {ticket.Title}");
 
         if (!string.IsNullOrEmpty(ticket.Description))
-        {e.WriteLine($"    desc     : {ticket.Description}");
+        {
+            Console.WriteLine($"    desc     : {ticket.Description}");
         }
 
-        Console.Write
-            Consol("    priority : ");
+        Console.Write("    priority : ");
         WriteColored(ticket.Priority.ToString(), PriorityColor(ticket.Priority));
         Console.Write("    status   : ");
         WriteColored(ticket.Status.ToString(), StatusColor(ticket.Status));

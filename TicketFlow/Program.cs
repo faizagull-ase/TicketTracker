@@ -27,7 +27,7 @@ if (args.Length > 0)
 }
 
 // No args (e.g. F5 in Visual Studio): interactive session.
-ui.(ShowBanner);
+ui.ShowBanner();
 
 while (true)
 {
