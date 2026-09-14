@@ -13,7 +13,9 @@ public record Ticket(
     TicketStatus Status,
     string? AssignedTo,
     DateTimeOffset CreatedAt,
-    DateTimeOffset UpdatedAt)
+    DateTimeOffset UpdatedAt
+    )
+
 {
     public const int MaxTitleLength = 120;
 

@@ -1,4 +1,5 @@
 using TicketFlow.Models;
+using TicketFlow.Repositories;
 using TicketFlow.Services;
 
 namespace TicketFlow.Cli;
@@ -18,7 +19,7 @@ public class CommandRouter
         _ui = ui;
     }
 
-    public void Execute(IReadOnlyList<string> tokens)
+    public async Task ExecuteAsync(IReadOnlyList<string> tokens)
     {
         ParsedCommand command;
 
@@ -26,6 +27,7 @@ public class CommandRouter
         {
             command = CommandParser.Parse(tokens);
         }
+        
         catch (Exception ex) when (ex is ArgumentException or FormatException)
         {
             _ui.Error(ex.Message);
@@ -37,22 +39,22 @@ public class CommandRouter
             switch (command.Name)
             {
                 case "add":
-                    HandleAdd(command);
+                    await HandleAddAsync(command);
                     break;
                 case "list":
-                    HandleList(command);
+                    await HandleListAsync(command);
                     break;
                 case "status":
-                    HandleStatus(command);
+                    await HandleStatusAsync(command);
                     break;
                 case "assign":
-                    HandleAssign(command);
+                    await HandleAssignAsync(command);
                     break;
                 case "search":
-                    HandleSearch(command);
+                    await HandleSearchAsync(command);
                     break;
                 case "stats":
-                    HandleStats(command);
+                    await HandleStatsAsync(command);
                     break;
                 case "help":
                     _ui.ShowHelp();
@@ -62,15 +64,19 @@ public class CommandRouter
                     break;
             }
         }
+        catch (TicketStoreException ex)
+        {
+            _ui.Error($"{ex.Message} {ex.RecoveryHint}");
+        }
         catch (Exception ex) when (ex is ArgumentException or InvalidOperationException)
         {
             _ui.Error(ex.Message);
         }
     }
 
-    private void HandleAdd(ParsedCommand command)
+    private async Task HandleAddAsync(ParsedCommand command)
     {
-        Ticket ticket = _service.AddTicket(
+        Ticket ticket = await _service.AddTicketAsync(
             command.Option("title"),
             command.Option("description"),
             command.Option("priority"),
@@ -80,9 +86,9 @@ public class CommandRouter
         _ui.RenderTicket(ticket);
     }
 
-    private void HandleList(ParsedCommand command)
+    private async Task HandleListAsync(ParsedCommand command)
     {
-        IReadOnlyList<Ticket> tickets = _service.ListTickets(
+        IReadOnlyList<Ticket> tickets = await _service.ListTicketsAsync(
             command.Option("status"),
             command.Option("priority"),
             command.Option("assignee"));
@@ -97,31 +103,31 @@ public class CommandRouter
         }
     }
 
-    private void HandleStatus(ParsedCommand command)
+    private async Task HandleStatusAsync(ParsedCommand command)
     {
         if (command.Positional.Count < 2)
         {
             throw new ArgumentException("Usage: status <id> <NewStatus>");
         }
 
-        Ticket updated = _service.ChangeStatus(command.Positional[0], command.Positional[1]);
+        Ticket updated = await _service.ChangeStatusAsync(command.Positional[0], command.Positional[1]);
         _ui.Success($"Ticket {updated.ShortId} status set to {updated.Status}.");
         _ui.RenderTicket(updated);
     }
 
-    private void HandleAssign(ParsedCommand command)
+    private async Task HandleAssignAsync(ParsedCommand command)
     {
         if (command.Positional.Count < 2)
         {
             throw new ArgumentException("Usage: assign <id> <username>");
         }
 
-        Ticket updated = _service.AssignTicket(command.Positional[0], command.Positional[1]);
+        Ticket updated = await _service.AssignTicketAsync(command.Positional[0], command.Positional[1]);
         _ui.Success($"Ticket {updated.ShortId} assigned to {updated.AssignedTo}.");
         _ui.RenderTicket(updated);
     }
 
-    private void HandleSearch(ParsedCommand command)
+    private async Task HandleSearchAsync(ParsedCommand command)
     {
         if (command.Positional.Count == 0)
         {
@@ -129,12 +135,13 @@ public class CommandRouter
         }
 
         string text = string.Join(' ', command.Positional);
-        _ui.RenderTicketsTable(_service.SearchTickets(text));
+        IReadOnlyList<Ticket> tickets = await _service.SearchTicketsAsync(text);
+        _ui.RenderTicketsTable(tickets);
     }
 
-    private void HandleStats(ParsedCommand command)
+    private async Task HandleStatsAsync(ParsedCommand command)
     {
-        TicketStats stats = _service.GetStats();
+        TicketStats stats = await _service.GetStatsAsync();
 
         if (command.HasFlag("json"))
         {

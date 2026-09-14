@@ -17,16 +17,18 @@ public class TicketService
         _repository = repository;
     }
 
-    public Ticket AddTicket(string? title, string? description, string? priorityRaw, string? assignee)
+    public async Task<Ticket> AddTicketAsync(
+        string? title, string? description, string? priorityRaw, string? assignee)
     {
         TicketPriority priority = ParsePriority(priorityRaw, TicketPriority.Medium);
         Ticket ticket = Ticket.Create(title, description, priority, assignee);
-        return _repository.Add(ticket);
+        return await _repository.AddAsync(ticket);
     }
 
-    public IReadOnlyList<Ticket> ListTickets(string? statusRaw, string? priorityRaw, string? assigneeRaw)
+    public async Task<IReadOnlyList<Ticket>> ListTicketsAsync(
+        string? statusRaw, string? priorityRaw, string? assigneeRaw)
     {
-        IEnumerable<Ticket> query = _repository.GetAll();
+        IEnumerable<Ticket> query = await _repository.GetAllAsync();
 
         if (!string.IsNullOrWhiteSpace(statusRaw))
         {
@@ -50,7 +52,7 @@ public class TicketService
         return query.OrderByDescending(t => t.CreatedAt).ToList();
     }
 
-    public IReadOnlyList<Ticket> SearchTickets(string text)
+    public async Task<IReadOnlyList<Ticket>> SearchTicketsAsync(string? text)
     {
         if (string.IsNullOrWhiteSpace(text))
         {
@@ -58,37 +60,38 @@ public class TicketService
         }
 
         string needle = text.Trim();
+        IReadOnlyList<Ticket> all = await _repository.GetAllAsync();
 
-        return _repository.GetAll()
+        return all
             .Where(t => t.Title.Contains(needle, StringComparison.OrdinalIgnoreCase)
                 || (t.Description?.Contains(needle, StringComparison.OrdinalIgnoreCase) ?? false))
             .OrderByDescending(t => t.CreatedAt)
             .ToList();
     }
 
-    public Ticket ChangeStatus(string idRaw, string newStatusRaw)
+    public async Task<Ticket> ChangeStatusAsync(string? idRaw, string? newStatusRaw)
     {
         TicketStatus newStatus = ParseStatus(newStatusRaw);
-        Ticket ticket = ResolveTicket(idRaw);
+        Ticket ticket = await ResolveTicketAsync(idRaw);
         Ticket updated = ticket with { Status = newStatus, UpdatedAt = DateTimeOffset.UtcNow };
-        return _repository.Update(updated);
+        return await _repository.UpdateAsync(updated);
     }
 
-    public Ticket AssignTicket(string idRaw, string? username)
+    public async Task<Ticket> AssignTicketAsync(string? idRaw, string? username)
     {
         if (string.IsNullOrWhiteSpace(username))
         {
             throw new ArgumentException("Username is required.", nameof(username));
         }
 
-        Ticket ticket = ResolveTicket(idRaw);
+        Ticket ticket = await ResolveTicketAsync(idRaw);
         Ticket updated = ticket with { AssignedTo = username.Trim(), UpdatedAt = DateTimeOffset.UtcNow };
-        return _repository.Update(updated);
+        return await _repository.UpdateAsync(updated);
     }
 
-    public TicketStats GetStats()
+    public async Task<TicketStats> GetStatsAsync()
     {
-        IReadOnlyList<Ticket> all = _repository.GetAll();
+        IReadOnlyList<Ticket> all = await _repository.GetAllAsync();
 
         Dictionary<TicketStatus, int> byStatus = Enum.GetValues<TicketStatus>()
             .ToDictionary(status => status, status => all.Count(t => t.Status == status));
@@ -108,7 +111,7 @@ public class TicketService
     /// Finds a ticket by full id or by an unambiguous id prefix, so a user
     /// doesn't have to retype a full GUID at the console.
     /// </summary>
-    private Ticket ResolveTicket(string? idRaw)
+    private async Task<Ticket> ResolveTicketAsync(string? idRaw)
     {
         if (string.IsNullOrWhiteSpace(idRaw))
         {
@@ -119,11 +122,12 @@ public class TicketService
 
         if (Guid.TryParse(id, out Guid exact))
         {
-            return _repository.GetById(exact)
+            return await _repository.GetByIdAsync(exact)
                 ?? throw new InvalidOperationException($"No ticket found with id '{id}'.");
         }
 
-        List<Ticket> matches = _repository.GetAll()
+        IReadOnlyList<Ticket> all = await _repository.GetAllAsync();
+        List<Ticket> matches = all
             .Where(t => t.Id.ToString().StartsWith(id, StringComparison.OrdinalIgnoreCase))
             .ToList();
 

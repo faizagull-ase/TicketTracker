@@ -3,25 +3,27 @@ using TicketFlow.Models;
 namespace TicketFlow.Repositories;
 
 /// <summary>
-/// Keeps tickets in memory for the lifetime of the process. This is the
-/// Day 1-3 storage; Day 4 introduces async persistence to tickets.json
-/// behind this same <see cref="ITicketRepository"/> contract.
+/// Keeps tickets in memory only, with no disk I/O. Useful as a fast test
+/// double for <see cref="Services.TicketService"/>; the app itself uses
+/// <see cref="JsonFileTicketRepository"/> so data survives a restart.
 /// </summary>
 public class InMemoryTicketRepository : ITicketRepository
 {
     private readonly Dictionary<Guid, Ticket> _tickets = new();
 
-    public Ticket Add(Ticket ticket)
+    public Task<Ticket> AddAsync(Ticket ticket)
     {
         _tickets[ticket.Id] = ticket;
-        return ticket;
+        return Task.FromResult(ticket);
     }
 
-    public Ticket? GetById(Guid id) => _tickets.TryGetValue(id, out Ticket? ticket) ? ticket : null;
+    public Task<Ticket?> GetByIdAsync(Guid id) =>
+        Task.FromResult(_tickets.TryGetValue(id, out Ticket? ticket) ? ticket : null);
 
-    public IReadOnlyList<Ticket> GetAll() => _tickets.Values.ToList();
+    public Task<IReadOnlyList<Ticket>> GetAllAsync() =>
+        Task.FromResult<IReadOnlyList<Ticket>>(_tickets.Values.ToList());
 
-    public Ticket Update(Ticket ticket)
+    public Task<Ticket> UpdateAsync(Ticket ticket)
     {
         if (!_tickets.ContainsKey(ticket.Id))
         {
@@ -29,6 +31,6 @@ public class InMemoryTicketRepository : ITicketRepository
         }
 
         _tickets[ticket.Id] = ticket;
-        return ticket;
+        return Task.FromResult(ticket);
     }
 }

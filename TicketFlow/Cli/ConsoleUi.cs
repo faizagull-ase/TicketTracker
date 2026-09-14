@@ -48,7 +48,7 @@ public class ConsoleUi
         Console.WriteLine();
         Console.ForegroundColor = ConsoleColor.DarkGray;
         Console.WriteLine("  Tip: <id> accepts the full ticket id or any unambiguous prefix of it.");
-        Console.WriteLine("  Note: data is in-memory only for now and resets each run (Day 4 adds persistence).");
+        Console.WriteLine("  Note: tickets are saved to tickets.json, so data survives a restart.");
         Console.ResetColor();
         Console.WriteLine();
     }
@@ -82,11 +82,11 @@ public class ConsoleUi
         Console.WriteLine($"    title    : {ticket.Title}");
 
         if (!string.IsNullOrEmpty(ticket.Description))
-        {
-            Console.WriteLine($"    desc     : {ticket.Description}");
+        {e.WriteLine($"    desc     : {ticket.Description}");
         }
 
-        Console.Write("    priority : ");
+        Console.Write
+            Consol("    priority : ");
         WriteColored(ticket.Priority.ToString(), PriorityColor(ticket.Priority));
         Console.Write("    status   : ");
         WriteColored(ticket.Status.ToString(), StatusColor(ticket.Status));

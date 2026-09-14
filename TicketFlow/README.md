@@ -3,7 +3,7 @@
 A support-ticket tracker you run from the console. Create tickets, filter them, change
 their status, assign them to people, and check overall stats.
 
-## Try it
+## How to run
 
 ```
 dotnet run --project TicketFlow
@@ -29,16 +29,13 @@ ticketflow> status a1b2 InProgress
 ticketflow> exit
 ```
 
-You can also run one command at a time from a regular shell:
+You can also run one command at a time from a regular shell - each run loads and saves
+`tickets.json`, so tickets created in one call are still there in the next:
 
 ```
 dotnet run --project TicketFlow -- add --title "Login page throws 500" --priority High
 dotnet run --project TicketFlow -- stats
 ```
-
-**Heads up:** there's no save file yet, so data only lives for as long as one run.
-Do all your testing in a single interactive session (as above) rather than across
-separate `dotnet run` calls, or you'll just see an empty list each time.
 
 ## Screenshots
 
@@ -93,8 +90,30 @@ terminal attached.
 `Ticket` is a record, and every change (status, assignee) produces a new copy via a
 `with` expression rather than editing the ticket in place.
 
-## Not built yet, on purpose
+All repository and service methods are `async` end to end - `ITicketRepository`'s file
+I/O never blocks the console loop - and `Nullable` reference types are enabled project-wide
+with a zero-warning build, so missing values (a null description, an unset assignee) are
+caught by the compiler rather than at runtime.
 
-Saving to a file (so data survives a restart) and structured async error handling are
-later milestones, not oversights - this stage focuses on the domain model, the
-repository pattern, and LINQ-based filtering/stats.
+## Error handling
+
+Every user-facing failure is surfaced as one readable `[!] ...` line instead of a stack
+trace:
+
+* **Bad CLI input** - a missing `--title`, an unknown `--priority`/status enum value, a
+  ticket id that doesn't exist or that matches more than one ticket - is reported by
+  `TicketService` as an `ArgumentException`/`InvalidOperationException` with the specific
+  problem and (for enums) the valid values.
+* **Bad tickets.json** - invalid JSON, or an entry missing a required field - is reported
+  by `JsonFileTicketRepository` as a `TicketStoreCorruptException`, naming the file and,
+  where possible, which entry is broken.
+* **A disk/OS-level failure** (permission denied, disk full, file locked) is reported as a
+  `TicketStoreIOException`.
+* Both derive from the abstract `TicketStoreException`, which `CommandRouter` catches
+  generically while each subclass supplies its own `RecoveryHint` shown to the user.
+* **A failed save** (disk full, file locked, permissions) rolls the in-memory change back
+  before reporting the error, so the app's state never claims a change was saved when it
+  wasn't.
+
+`CommandRouter` catches exactly these expected exception types around every command;
+anything else is a bug and is allowed to propagate.

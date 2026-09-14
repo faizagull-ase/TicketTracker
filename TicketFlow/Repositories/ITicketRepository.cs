@@ -4,18 +4,19 @@ namespace TicketFlow.Repositories;
 
 /// <summary>
 /// Storage contract for tickets. Command-handling code depends only on this
-/// interface, never on a concrete storage mechanism - so the in-memory
-/// implementation used through Day 3 can be swapped for a file- or
-/// database-backed one later without touching any calling code.
+/// interface, never on a concrete storage mechanism - so the file-backed
+/// implementation can be swapped (e.g. for a database) without touching any
+/// calling code. All I/O is asynchronous so a slow disk never blocks the
+/// console loop.
 /// </summary>
 public interface ITicketRepository
 {
-    Ticket Add(Ticket ticket);
+    Task<Ticket> AddAsync(Ticket ticket);
 
-    Ticket? GetById(Guid id);
+    Task<Ticket?> GetByIdAsync(Guid id);
 
-    IReadOnlyList<Ticket> GetAll();
+    Task<IReadOnlyList<Ticket>> GetAllAsync();
 
     /// <summary>Replaces an existing ticket with an updated copy. Throws if no ticket with that id exists.</summary>
-    Ticket Update(Ticket ticket);
+    Task<Ticket> UpdateAsync(Ticket ticket);
 }
