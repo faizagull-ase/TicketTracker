@@ -6,7 +6,7 @@ namespace TicketFlow.Models;
 /// version of a ticket that ever existed is a distinct, comparable value.
 /// </summary>
 public record Ticket(
-    Guid Id,
+    int Id,
     string Title,
     string? Description,
     TicketPriority Priority,
@@ -23,7 +23,8 @@ public record Ticket(
     /// Creates a new, validated ticket in the <see cref="TicketStatus.Open"/> state.
     /// Validation lives here (not in the record constructor) so that <c>with</c>
     /// expressions used to update an existing ticket stay simple and don't
-    /// re-run creation rules like "title is required".
+    /// re-run creation rules like "title is required". <see cref="Id"/> is left as
+    /// 0 - a real, unique id is assigned by <see cref="Repositories.ITicketRepository.AddAsync"/>.
     /// </summary>
     public static Ticket Create(string? title, string? description, TicketPriority priority, string? assignedTo)
     {
@@ -44,7 +45,7 @@ public record Ticket(
         DateTimeOffset now = DateTimeOffset.UtcNow;
 
         return new Ticket(
-            Id: Guid.NewGuid(),
+            Id: 0,
             Title: trimmedTitle,
             Description: string.IsNullOrWhiteSpace(description) ? null : description.Trim(),
             Priority: priority,
@@ -54,5 +55,5 @@ public record Ticket(
             UpdatedAt: now);
     }
 
-    public string ShortId => Id.ToString()[..8];
+    public string ShortId => Id.ToString();
 }

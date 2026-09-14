@@ -9,15 +9,17 @@ namespace TicketFlow.Repositories;
 /// </summary>
 public class InMemoryTicketRepository : ITicketRepository
 {
-    private readonly Dictionary<Guid, Ticket> _tickets = new();
+    private readonly Dictionary<int, Ticket> _tickets = new();
+    private int _nextId = 1;
 
     public Task<Ticket> AddAsync(Ticket ticket)
     {
-        _tickets[ticket.Id] = ticket;
-        return Task.FromResult(ticket);
+        Ticket stored = ticket with { Id = _nextId++ };
+        _tickets[stored.Id] = stored;
+        return Task.FromResult(stored);
     }
 
-    public Task<Ticket?> GetByIdAsync(Guid id) =>
+    public Task<Ticket?> GetByIdAsync(int id) =>
         Task.FromResult(_tickets.TryGetValue(id, out Ticket? ticket) ? ticket : null);
 
     public Task<IReadOnlyList<Ticket>> GetAllAsync() =>

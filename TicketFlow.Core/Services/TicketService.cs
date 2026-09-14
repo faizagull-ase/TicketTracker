@@ -25,6 +25,8 @@ public class TicketService
         return await _repository.AddAsync(ticket);
     }
 
+    public Task<Ticket?> GetTicketAsync(int id) => _repository.GetByIdAsync(id);
+
     public async Task<IReadOnlyList<Ticket>> ListTicketsAsync(
         string? statusRaw, string? priorityRaw, string? assigneeRaw)
     {
@@ -69,6 +71,38 @@ public class TicketService
             .ToList();
     }
 
+    /// <summary>Replaces a ticket's title, description, and priority. Status and assignee are untouched - use <see cref="ChangeStatusAsync"/>/<see cref="AssignTicketAsync"/> for those.</summary>
+    public async Task<Ticket> UpdateTicketAsync(string? idRaw, string? title, string? description, string? priorityRaw)
+    {
+        Ticket ticket = await ResolveTicketAsync(idRaw);
+
+        string trimmedTitle = (title ?? string.Empty).Trim();
+
+        if (string.IsNullOrWhiteSpace(trimmedTitle))
+        {
+            throw new ArgumentException("Title is required.", nameof(title));
+        }
+
+        if (trimmedTitle.Length > Ticket.MaxTitleLength)
+        {
+            throw new ArgumentException(
+                $"Title must be {Ticket.MaxTitleLength} characters or fewer (was {trimmedTitle.Length}).",
+                nameof(title));
+        }
+
+        TicketPriority priority = ParsePriority(priorityRaw, ticket.Priority);
+
+        Ticket updated = ticket with
+        {
+            Title = trimmedTitle,
+            Description = string.IsNullOrWhiteSpace(description) ? null : description.Trim(),
+            Priority = priority,
+            UpdatedAt = DateTimeOffset.UtcNow
+        };
+
+        return await _repository.UpdateAsync(updated);
+    }
+
     public async Task<Ticket> ChangeStatusAsync(string? idRaw, string? newStatusRaw)
     {
         TicketStatus newStatus = ParseStatus(newStatusRaw);
@@ -107,10 +141,6 @@ public class TicketService
         return new TicketStats(all.Count, byStatus, byPriority, oldestOpen);
     }
 
-    /// <summary>
-    /// Finds a ticket by full id or by an unambiguous id prefix, so a user
-    /// doesn't have to retype a full GUID at the console.
-    /// </summary>
     private async Task<Ticket> ResolveTicketAsync(string? idRaw)
     {
         if (string.IsNullOrWhiteSpace(idRaw))
@@ -120,24 +150,13 @@ public class TicketService
 
         string id = idRaw.Trim();
 
-        if (Guid.TryParse(id, out Guid exact))
+        if (!int.TryParse(id, out int parsedId))
         {
-            return await _repository.GetByIdAsync(exact)
-                ?? throw new InvalidOperationException($"No ticket found with id '{id}'.");
+            throw new ArgumentException($"Invalid ticket id '{id}'.", nameof(idRaw));
         }
 
-        IReadOnlyList<Ticket> all = await _repository.GetAllAsync();
-        List<Ticket> matches = all
-            .Where(t => t.Id.ToString().StartsWith(id, StringComparison.OrdinalIgnoreCase))
-            .ToList();
-
-        return matches.Count switch
-        {
-            0 => throw new InvalidOperationException($"No ticket found with id '{id}'."),
-            1 => matches[0],
-            _ => throw new InvalidOperationException(
-                $"Id '{id}' matches {matches.Count} tickets; use more characters to disambiguate.")
-        };
+        return await _repository.GetByIdAsync(parsedId)
+            ?? throw new InvalidOperationException($"No ticket found with id '{id}'.");
     }
 
     private static TicketPriority ParsePriority(string? raw, TicketPriority defaultValue)

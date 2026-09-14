@@ -11,9 +11,10 @@ namespace TicketFlow.Repositories;
 /// </summary>
 public interface ITicketRepository
 {
+    /// <summary>Adds a ticket and assigns it the next available id, ignoring whatever <see cref="Ticket.Id"/> it was created with.</summary>
     Task<Ticket> AddAsync(Ticket ticket);
 
-    Task<Ticket?> GetByIdAsync(Guid id);
+    Task<Ticket?> GetByIdAsync(int id);
 
     Task<IReadOnlyList<Ticket>> GetAllAsync();
 

@@ -20,8 +20,9 @@ public class JsonFileTicketRepository : ITicketRepository
     };
 
     private readonly string _filePath;
-    private readonly Dictionary<Guid, Ticket> _tickets = new();
+    private readonly Dictionary<int, Ticket> _tickets = new();
     private bool _loaded;
+    private int _nextId = 1;
 
     public JsonFileTicketRepository(string filePath)
     {
@@ -34,12 +35,20 @@ public class JsonFileTicketRepository : ITicketRepository
     {
         await EnsureLoadedAsync();
 
-        _tickets[ticket.Id] = ticket;
-        await SaveAsync(rollback: () => _tickets.Remove(ticket.Id));
-        return ticket;
+        Ticket stored = ticket with { Id = _nextId };
+        _tickets[stored.Id] = stored;
+        _nextId++;
+
+        await SaveAsync(rollback: () =>
+        {
+            _tickets.Remove(stored.Id);
+            _nextId--;
+        });
+
+        return stored;
     }
 
-    public async Task<Ticket?> GetByIdAsync(Guid id)
+    public async Task<Ticket?> GetByIdAsync(int id)
     {
         await EnsureLoadedAsync();
         return _tickets.TryGetValue(id, out Ticket? ticket) ? ticket : null;
@@ -111,13 +120,18 @@ public class JsonFileTicketRepository : ITicketRepository
         {
             Ticket? ticket = tickets[i];
 
-            if (ticket is null || ticket.Id == Guid.Empty || string.IsNullOrWhiteSpace(ticket.Title))
+            if (ticket is null || ticket.Id <= 0 || string.IsNullOrWhiteSpace(ticket.Title))
             {
                 throw new TicketStoreCorruptException(
                     _filePath, $"'{_filePath}' entry #{i + 1} is missing a required field (id/title).");
             }
 
             _tickets[ticket.Id] = ticket;
+        }
+
+        if (_tickets.Count > 0)
+        {
+            _nextId = _tickets.Keys.Max() + 1;
         }
     }
 

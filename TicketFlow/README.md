@@ -14,17 +14,17 @@ several commands in a row:
 
 ```
 ticketflow> add --title "Login page throws 500" --priority High --assignee alice
-  [OK] Created ticket a1b2c3d4 - "Login page throws 500"
+  [OK] Created ticket 1 - "Login page throws 500"
 
 ticketflow> list
-  ╔══════════╦════════════════════════╦══════════╦════════╦══════════╗
-  ║ ID       ║ TITLE                  ║ PRIORITY ║ STATUS ║ ASSIGNEE ║
-  ╠══════════╬════════════════════════╬══════════╬════════╬══════════╣
-  ║ a1b2c3d4 ║ Login page throws 500  ║ High     ║ Open   ║ alice    ║
-  ╚══════════╩════════════════════════╩══════════╩════════╩══════════╝
+  ╔════╦════════════════════════╦══════════╦════════╦══════════╗
+  ║ ID ║ TITLE                  ║ PRIORITY ║ STATUS ║ ASSIGNEE ║
+  ╠════╬════════════════════════╬══════════╬════════╬══════════╣
+  ║ 1  ║ Login page throws 500  ║ High     ║ Open   ║ alice    ║
+  ╚════╩════════════════════════╩══════════╩════════╩══════════╝
 
-ticketflow> status a1b2 InProgress
-  [OK] Ticket a1b2c3d4 status set to InProgress.
+ticketflow> status 1 InProgress
+  [OK] Ticket 1 status set to InProgress.
 
 ticketflow> exit
 ```
@@ -68,9 +68,7 @@ Startup banner and `help`:
 | `help` | Print this command list from inside the app. |
 | `exit` | Leave the interactive session. |
 
-For `<id>`, you don't need to type the full GUID - the short id shown by `list`/`add`
-(or even just the first few characters, as long as they're not shared by another
-ticket) is enough.
+`<id>` is the simple numeric id shown by `list`/`add` - no GUIDs to copy-paste.
 
 ## How it's put together
 
