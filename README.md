@@ -1,6 +1,6 @@
 # TicketFlow.Api (Web API)
 
-A REST API for the same support-ticket tracker as the [TicketFlow console app](../TicketFlow/README.md) -
+A REST API for the same support-ticket tracker as the [TicketFlow console app] -
 same domain, same rules, exposed over HTTP instead of a terminal.
 
 ## How to run
