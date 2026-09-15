@@ -1,98 +1,93 @@
-# TicketFlow (CLI)
+# TicketFlow.Api (Web API)
 
-A support-ticket tracker you run from the console. Create tickets, filter them, change
-their status, assign them to people, and check overall stats.
+A REST API for the same support-ticket tracker as the [TicketFlow console app](../TicketFlow/README.md) -
+same domain, same rules, exposed over HTTP instead of a terminal.
+
+## How to run
+
+```
+dotnet run --project TicketFlow.Api
+```
+
+Swagger's OpenAPI document is served at `/openapi/v1.json` in Development
+(`app.MapOpenApi()`); there's no Swagger UI wired up yet, just the spec.
+
+**Heads up:** storage is in-memory (`InMemoryTicketRepository`), so all tickets are lost
+when the process restarts. That's intentional for now - see [How it's put together](#how-its-put-together).
+
+## Endpoints
+
+| Method | Route | Purpose | Success | Failure |
+|---|---|---|---|---|
+| `POST` | `/tickets` | Create a ticket | `201 Created` + `Location` header | `400` bad title/priority |
+| `GET` | `/tickets?status=&priority=&assignee=` | List tickets, with optional filters | `200 OK` | `400` bad status/priority filter |
+| `GET` | `/tickets/{id}` | Get one ticket | `200 OK` | `404` no such id |
+| `PUT` | `/tickets/{id}` | Replace title / description / priority | `204 No Content` | `400` bad input, `404` no such id |
+| `PATCH` | `/tickets/{id}/status` | Change status | `200 OK` + ticket | `400` bad status, `404` no such id |
+| `PATCH` | `/tickets/{id}/assignee` | Set the assignee | `200 OK` + ticket | `400` missing username, `404` no such id |
+| `GET` | `/tickets/stats` | Counts by status & priority, oldest open ticket | `200 OK` | - |
+
+`{id}` is the same simple integer id shown in every response's `id` field (see
+[Ids](#ids-are-just-integers) below) - `/tickets/1`, not a GUID.
+
+Every error body has the same shape:
+
+```json
+{ "error": "Invalid status 'Bogus'. Valid values: Open, InProgress, Resolved, Closed." }
+```
 
 ## Try it
 
 ```
-dotnet run --project TicketFlow
+dotnet run --project TicketFlow.Api
 ```
 
-With no arguments, TicketFlow drops you into an interactive session so you can try
-several commands in a row:
-
 ```
-ticketflow> add --title "Login page throws 500" --priority High --assignee alice
-  [OK] Created ticket 1 - "Login page throws 500"
+curl -i -X POST http://localhost:5181/tickets \
+  -H "Content-Type: application/json" \
+  -d '{"title":"Login page throws 500","priority":"High","assignedTo":"alice"}'
 
-ticketflow> list
-  ╔════╦════════════════════════╦══════════╦════════╦══════════╗
-  ║ ID ║ TITLE                  ║ PRIORITY ║ STATUS ║ ASSIGNEE ║
-  ╠════╬════════════════════════╬══════════╬════════╬══════════╣
-  ║ 1  ║ Login page throws 500  ║ High     ║ Open   ║ alice    ║
-  ╚════╩════════════════════════╩══════════╩════════╩══════════╝
+# HTTP/1.1 201 Created
+# Location: http://localhost:5181/tickets/1
+# {"id":1,"title":"Login page throws 500","description":null,"priority":"High",
+#  "status":"Open","assignedTo":"alice","createdAt":"...","updatedAt":"...","shortId":"1"}
 
-ticketflow> status 1 InProgress
-  [OK] Ticket 1 status set to InProgress.
+curl http://localhost:5181/tickets
 
-ticketflow> exit
+curl -X PATCH http://localhost:5181/tickets/1/status \
+  -H "Content-Type: application/json" -d '{"status":"InProgress"}'
+
+curl http://localhost:5181/tickets/stats
 ```
 
-You can also run one command at a time from a regular shell:
+## Ids are just integers
 
-```
-dotnet run --project TicketFlow -- add --title "Login page throws 500" --priority High
-dotnet run --project TicketFlow -- stats
-```
-
-**Heads up:** there's no save file yet, so data only lives for as long as one run.
-Do all your testing in a single interactive session (as above) rather than across
-separate `dotnet run` calls, or you'll just see an empty list each time.
-
-## Screenshots
-
-Startup banner and `help`:
-
-![Banner and help screen](docs/screenshots/banner-and-help.png)
-
-`add` (with a missing-title error first), `list`, and `search`:
-
-![add, list, and search](docs/screenshots/add-list-search.png)
-
-`stats --json`:
-
-![stats as JSON](docs/screenshots/stats-json.png)
-
-`stats` as a colored table, then `exit`:
-
-![stats table and exit](docs/screenshots/stats-table.png)
-
-## Commands
-
-| Command | What it does |
-|---|---|
-| `add --title "..." [--description "..."] [--priority Low\|Medium\|High\|Critical] [--assignee name]` | Create a ticket. Priority defaults to Medium; status always starts Open. |
-| `list [--status ...] [--priority ...] [--assignee ...] [--json]` | Show tickets, newest first. Any combination of filters can be used together. |
-| `status <id> <NewStatus>` | Move a ticket to Open / InProgress / Resolved / Closed. |
-| `assign <id> <username>` | Set or reassign who's working on it. |
-| `search <text>` | Find tickets whose title or description mentions the text. |
-| `stats [--json]` | Counts per status, counts per priority, and the oldest ticket still Open. |
-| `help` | Print this command list from inside the app. |
-| `exit` | Leave the interactive session. |
-
-`<id>` is the simple numeric id shown by `list`/`add` - no GUIDs to copy-paste.
+Tickets are numbered `1, 2, 3, ...` in the order they're created - assigned by whichever
+`ITicketRepository` is in use, not chosen by the client. `POST` ignores any `id` you send
+and returns the one it assigned; use that value (or the `Location` header) for every
+later request.
 
 ## How it's put together
 
 ```
-Models/        Ticket (a record), TicketPriority, TicketStatus
-Repositories/  ITicketRepository + an in-memory implementation
-Services/      TicketService - the actual add/list/filter/stats logic
-Cli/           turns typed input into a command, runs it, prints the result
+Controllers/  TicketsController - translates HTTP <-> TicketService calls, nothing else
+Records/      Request DTOs (CreateTicketRequest, UpdateTicketRequest, ...)
+Program.cs    DI registration (ITicketRepository, TicketService), middleware pipeline
 ```
 
-The layering is deliberate: `TicketService` only knows about `ITicketRepository` (an
-interface), never the concrete in-memory store - so swapping in real file or database
-storage later is a new class, not a rewrite. Same idea with the console output: nothing
-in `TicketService` prints or colors anything, so the logic stays testable without a
-terminal attached.
+None of the ticket domain or business logic lives in this project - it's all reused,
+unchanged, from the same libraries the console app depends on:
 
-`Ticket` is a record, and every change (status, assignee) produces a new copy via a
-`with` expression rather than editing the ticket in place.
+* **`TicketFlow.Core`** - `Ticket`, `TicketPriority`, `TicketStatus`, `TicketService`
+  (validation, filtering, stats), and the `ITicketRepository` abstraction.
+* **`TicketFlow.Infrastructure`** - concrete repositories. This API is wired to
+  `InMemoryTicketRepository`; the console app uses `JsonFileTicketRepository` instead.
+  Swapping which one this API uses is a one-line change in `Program.cs`, not a rewrite.
 
-## Not built yet, on purpose
+`TicketsController` stays intentionally thin: every action either returns the result of
+a `TicketService` call directly, or maps one of its exceptions to a status code
+(`ArgumentException` -> 400, `InvalidOperationException` -> 404,
+`TicketStoreException` -> 500). No validation or state-mutation logic lives in the
+controller itself.
 
-Saving to a file (so data survives a restart) and structured async error handling are
-later milestones, not oversights - this stage focuses on the domain model, the
-repository pattern, and LINQ-based filtering/stats.
+
